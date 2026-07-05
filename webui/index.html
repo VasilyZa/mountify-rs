@@ -2,85 +2,109 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>mountify</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
     <script src="index.js" type="module"></script>
-    <link rel="stylesheet" href="styles.css" type="text/css">
 </head>
 <body>
-    <div class="root_layout">
-        <div class="header">
-            <div class="top-bar" slot="headline">
-                <span>mountify</span><span id="version"></span>
-                <div class="spacer"></div>
-                <md-icon-button id="language"><md-icon>language</md-icon></md-icon-button>
-                <md-icon-button id="reboot"><md-icon>power_settings_new</md-icon></md-icon-button>
+    <div class="scanlines"></div>
+
+    <div class="app">
+        <header class="topbar">
+            <div class="topbar-left">
+                <span class="logo">&gt; mountify</span>
+                <span class="version" id="version"></span>
             </div>
-            <md-tabs>
-                <md-primary-tab id="general-tab" aria-controls="content-general" data-i18n="tab_general" active>General</md-primary-tab>
-                <md-primary-tab id="ext4-tab" aria-controls="content-ext4" data-i18n="tab_ext4">Ext4</md-primary-tab>
-                <md-primary-tab id="advanced-tab" aria-controls="content-advanced" data-i18n="tab_advanced">Advanced</md-primary-tab>
-            </md-tabs>
+            <div class="topbar-right">
+                <button class="hud-btn" id="language" title="Language" aria-label="Switch language">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                </button>
+                <button class="hud-btn" id="reboot" title="Reboot" aria-label="Reboot device">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="status-hud">
+            <div class="stat"><span class="stat-label" data-i18n="stat.mode">MODE</span><span class="stat-value" id="stat-mode">--</span></div>
+            <div class="stat"><span class="stat-label" data-i18n="stat.fstype">FSTYPE</span><span class="stat-value" id="stat-fstype">--</span></div>
+            <div class="stat"><span class="stat-label" data-i18n="stat.modules">MODULES</span><span class="stat-value" id="stat-modules">--</span></div>
         </div>
-        <div class="horizontal-pager">
-            <div class="content-container unresolved" id="content-general" role="tabpanel" aria-labelledby="general-tab"></div>
-            <div class="content-container unresolved" id="content-ext4" role="tabpanel" aria-labelledby="ext4-tab"></div>
-            <div class="content-container unresolved" id="content-advanced" role="tabpanel" aria-labelledby="advanced-tab">
-                <div class="list-container content">
-                    <label class="list-item switch-item">
-                        <span data-i18n="show_advanced_option">Show advanced option</span>
-                        <md-switch icons id="advanced"></md-switch>
-                        <md-ripple></md-ripple>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="general">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span data-i18n="tab.general">General</span>
+            </button>
+            <button class="tab" data-tab="ext4">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                <span data-i18n="tab.ext4">Ext4</span>
+            </button>
+            <button class="tab" data-tab="advanced">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                <span data-i18n="tab.advanced">Advanced</span>
+            </button>
+        </nav>
+
+        <main class="panels">
+            <div class="panel active" id="panel-general"><div class="card" id="general-group"></div></div>
+            <div class="panel" id="panel-ext4"><div class="card" id="ext4-group"></div></div>
+            <div class="panel" id="panel-advanced">
+                <div class="card">
+                    <label class="switch-row">
+                        <span data-i18n="desc_advanced">Show advanced options</span>
+                        <input type="checkbox" id="advanced-toggle" class="switch">
                     </label>
-                    <label class="list-item switch-item">
-                        <span data-i18n="enable_mountify_update">Enable mountify update</span>
-                        <md-switch icons id="update"></md-switch>
-                        <md-ripple></md-ripple>
+                    <label class="switch-row">
+                        <span data-i18n="desc_update">Check for updates</span>
+                        <input type="checkbox" id="update-toggle" class="switch">
                     </label>
                 </div>
+                <div class="card" id="advanced-group"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Description Modal -->
+    <div class="modal-overlay" id="desc-modal">
+        <div class="modal">
+            <div class="modal-hdr"><span id="modal-title"></span><button class="modal-x modal-close">&times;</button></div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Module Selector Modal -->
+    <div class="modal-overlay" id="module-modal">
+        <div class="modal modal-wide">
+            <div class="modal-hdr" data-i18n="modules.title"><span>Select Modules</span><button class="modal-x modal-close">&times;</button></div>
+            <div class="modal-body" id="module-list"></div>
+            <div class="modal-ftr"><button class="btn primary" id="module-save" data-i18n="modules.save">Save</button></div>
+        </div>
+    </div>
+
+    <!-- Reboot Modal -->
+    <div class="modal-overlay" id="reboot-modal">
+        <div class="modal modal-sm">
+            <div class="modal-hdr"><span data-i18n="reboot.title">Reboot</span><button class="modal-x modal-close">&times;</button></div>
+            <div class="modal-body" data-i18n="reboot.msg">Reboot now?</div>
+            <div class="modal-ftr">
+                <button class="btn" id="reboot-cancel" data-i18n="reboot.cancel">Cancel</button>
+                <button class="btn danger" id="reboot-confirm" data-i18n="reboot.confirm">Reboot</button>
             </div>
         </div>
     </div>
 
-    <div class="dialog-wrapper" unresolved>
-        <md-dialog id="confirm-reboot-dialog">
-            <div slot="headline" data-i18n="reboot_title">Reboot</div>
-            <div slot="content" data-i18n="reboot_message">Reboot now?</div>
-            <div slot="actions">
-                <md-text-button value="cancel" data-i18n="cancel">Cancel</md-text-button>
-                <md-text-button value="reboot" data-i18n="reboot">Reboot</md-text-button>
-            </div>
-        </md-dialog>
-
-        <md-dialog id="description-dialog">
-            <div slot="headline"></div>
-            <div slot="content"></div>
-            <div slot="actions">
-                <md-text-button form="description-dialog" value="close" data-i18n="close">Close</md-text-button>
-            </div>
-        </md-dialog>
-
-        <md-dialog id="module-selector-dialog">
-            <div slot="headline" data-i18n="select_modules">Select Modules</div>
-            <div slot="content">
-                <md-list id="module-list"></md-list>
-            </div>
-            <div slot="actions">
-                <md-text-button form="module-selector-dialog" value="close" data-i18n="save">Save</md-text-button>
-            </div>
-        </md-dialog>
-
-        <md-dialog id="language-dialog">
-            <div slot="headline" data-i18n="select_language">Select Language</div>
-            <div slot="content">
-                <form id="language-form" method="dialog" class="list-container">
-                    <!-- Language options -->
-                </form>
-            </div>
-            <div slot="actions">
-                <md-text-button value="cancel" data-i18n="cancel">Cancel</md-text-button>
-            </div>
-        </md-dialog>
+    <!-- Language Modal -->
+    <div class="modal-overlay" id="lang-modal">
+        <div class="modal modal-sm">
+            <div class="modal-hdr"><span data-i18n="lang.title">Select Language</span><button class="modal-x modal-close">&times;</button></div>
+            <div class="modal-body" id="lang-list"></div>
+        </div>
     </div>
+
+    <div id="toast-container"></div>
 </body>
 </html>

@@ -1,180 +1,121 @@
-const rtlLang = [
-    'ar',  // Arabic
-    'fa',  // Persian
-    'he',  // Hebrew
-    'ur',  // Urdu
-    'ps',  // Pashto
-    'sd',  // Sindhi
-    'ku',  // Kurdish
-    'yi',  // Yiddish
-    'dv',  // Dhivehi
-];
+const LANGUAGES = {
+    'en': { name: 'English', native: 'English' },
+    'zh-CN': { name: 'Chinese (Simplified)', native: '简体中文' },
+};
 
-export let translations = {};
-let baseTranslations = {};
-let availableLanguages = ['en'];
-let languageNames = {};
+const TRANSLATIONS = {
+    'en': {
+        'tab.general': 'General',
+        'tab.ext4': 'Ext4',
+        'tab.advanced': 'Advanced',
+        'stat.mode': 'MODE',
+        'stat.fstype': 'FSTYPE',
+        'stat.modules': 'MODULES',
+        'stat.na': 'N/A',
+        'stat.active': 'ACTIVE',
+        'stat.off': 'OFF',
+        'stat.manual': 'MANUAL',
+        'stat.auto': 'AUTO',
+        'stat.tmpfs': 'TMPFS',
+        'stat.ext4': 'EXT4',
+        'stat.apex': 'APEX',
+        'desc_advanced': 'Show advanced options',
+        'desc_update': 'Check for updates',
+        'reboot.title': 'Reboot',
+        'reboot.msg': 'Reboot now?',
+        'reboot.confirm': 'Reboot',
+        'reboot.cancel': 'Cancel',
+        'modules.title': 'Select Modules',
+        'modules.save': 'Save',
+        'modules.select': 'SELECT',
+        'toast.config_not_found': 'Config not found',
+        'toast.save_failed': 'Save failed',
+        'toast.lang_soon': 'More languages coming soon',
+        'lang.title': 'Select Language',
+        'placeholder': 'Language',
 
-/**
- * Parse XML translation file into a JavaScript object
- * @param {string} xmlText - The XML content as string
- * @returns {Object} - Parsed translations
- */
-function parseTranslationsXML(xmlText) {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-    const strings = xmlDoc.getElementsByTagName('string');
-    const translations = {};
+        'desc.mountify_mounts': '0 = disable\n1 = manual (use modules.txt)\n2 = auto (mount all with system folder)',
+        'desc.FAKE_MOUNT_NAME': 'Mount folder name under /mnt/vendor.\nDefault: mountify',
+        'desc.test_decoy_mount': 'Test for decoy mount detection (tmpfs mode only).\nUses blank system folders as decoy targets.',
+        'desc.mountify_stop_start': 'Restart Android at service stage.\nWorkaround for racey modules (GPU, bootanim).',
+        'desc.FS_TYPE_ALIAS': 'Custom overlayfs driver alias.\nOnly useful if kernel registered another alias.',
+        'desc.MOUNT_DEVICE_NAME': 'Device name for zygisk unmount.\nAllows NeoZygisk/NoHello/etc to hide mounts.',
+        'desc.mountify_custom_umount': '0 = disable\n1 = susfs4ksu try_umount\n2 = ksud kernel umount (KSU 22106+)',
+        'desc.mountify_expert_mode': 'Disables safety checks.\nWARNING: you can bootloop!',
+        'desc.use_ext4_sparse': 'Force ext4 sparse mode even if tmpfs xattr works.',
+        'desc.spoof_sparse': 'Spoof sparse mount as an Android apex service mount.\nDisables LKM nuke.',
+        'desc.FAKE_APEX_NAME': 'Apex name used when spoof_sparse=1.',
+        'desc.sparse_size': 'Sparse image size in MB.\nDefault: 2048',
+        'desc.enable_lkm_nuke': 'Load LKM to unregister ext4 sysfs.\nHides ext4 nodes from /proc/fs.',
+        'desc.lkm_filename': 'Select LKM filename matching your kernel.',
+    },
+    'zh-CN': {
+        'tab.general': '常规',
+        'tab.ext4': 'Ext4',
+        'tab.advanced': '高级',
+        'stat.mode': '模式',
+        'stat.fstype': '文件系统',
+        'stat.modules': '模块',
+        'stat.na': '无',
+        'stat.active': '运行中',
+        'stat.off': '关闭',
+        'stat.manual': '手动',
+        'stat.auto': '自动',
+        'stat.tmpfs': 'TMPFS',
+        'stat.ext4': 'EXT4',
+        'stat.apex': 'APEX',
+        'desc_advanced': '显示高级选项',
+        'desc_update': '检查更新',
+        'reboot.title': '重启',
+        'reboot.msg': '立即重启设备？',
+        'reboot.confirm': '重启',
+        'reboot.cancel': '取消',
+        'modules.title': '选择模块',
+        'modules.save': '保存',
+        'modules.select': '选择',
+        'toast.config_not_found': '未找到配置文件',
+        'toast.save_failed': '保存失败',
+        'toast.lang_soon': '更多语言即将支持',
+        'lang.title': '选择语言',
+        'placeholder': '语言',
 
-    for (let i = 0; i < strings.length; i++) {
-        const string = strings[i];
-        const name = string.getAttribute('name');
-        const value = string.textContent.replace(/\\n/g, '\n');
-        translations[name] = value;
+        'desc.mountify_mounts': '0 = 禁用\n1 = 手动模式（使用 modules.txt）\n2 = 自动模式（挂载所有含 system 文件夹的模块）',
+        'desc.FAKE_MOUNT_NAME': '挂载文件夹名称（位于 /mnt/vendor 下）。\n默认：mountify',
+        'desc.test_decoy_mount': '测试诱饵挂载检测（仅 tmpfs 模式）。\n使用空白系统文件夹作为诱饵目标。',
+        'desc.mountify_stop_start': '在 service 阶段重启 Android。\n解决竞争性模块问题（GPU、开机动画等）。',
+        'desc.FS_TYPE_ALIAS': '自定义 overlayfs 驱动别名。\n仅当内核注册了其他别名时有用。',
+        'desc.MOUNT_DEVICE_NAME': 'zygisk 卸载的设备名称。\n允许 NeoZygisk/NoHello 等隐藏挂载。',
+        'desc.mountify_custom_umount': '0 = 禁用\n1 = susfs4ksu try_umount\n2 = ksud 内核卸载（KSU 22106+）',
+        'desc.mountify_expert_mode': '禁用安全检查。\n警告：可能导致启动循环！',
+        'desc.use_ext4_sparse': '强制使用 ext4 sparse 模式，即使 tmpfs xattr 可用。',
+        'desc.spoof_sparse': '将 sparse 挂载伪装为 Android apex 服务挂载。\n禁用 LKM nuke。',
+        'desc.FAKE_APEX_NAME': 'spoof_sparse=1 时使用的 apex 名称。',
+        'desc.sparse_size': 'sparse 镜像大小（MB）。\n默认：2048',
+        'desc.enable_lkm_nuke': '加载 LKM 以注销 ext4 sysfs。\n从 /proc/fs 隐藏 ext4 节点。',
+        'desc.lkm_filename': '选择与内核匹配的 LKM 文件名。',
+    },
+};
+
+let currentLang = 'en';
+
+export function t(key) {
+    const lang = TRANSLATIONS[currentLang];
+    return lang?.[key] ?? TRANSLATIONS['en'][key] ?? key;
+}
+
+export function getLang() { return currentLang; }
+export function setLang(code) {
+    if (TRANSLATIONS[code]) {
+        currentLang = code;
+        localStorage.setItem('mountify_lang', code);
     }
-
-    return translations;
 }
 
-/**
- * Detect user's default language
- * @returns {Promise<string>} - Detected language code
- */
-async function detectUserLanguage() {
-    const userLang = navigator.language || navigator.userLanguage;
-    const langCode = userLang.split('-')[0];
-
-    try {
-        // Fetch available languages
-        const availableResponse = await fetch('locales/languages.json');
-        const availableData = await availableResponse.json();
-        availableLanguages = Object.keys(availableData);
-        languageNames = availableData;
-
-        // Fetch preferred language
-        const prefered_language_code = localStorage.getItem('mountify_language');
-
-        // Check if preferred language is valid
-        if (prefered_language_code !== 'default' && availableLanguages.includes(prefered_language_code)) {
-            return prefered_language_code;
-        } else if (availableLanguages.includes(userLang)) {
-            return userLang;
-        } else if (availableLanguages.includes(langCode)) {
-            return langCode;
-        } else {
-            localStorage.removeItem('mountify_language');
-            return 'en';
-        }
-    } catch (error) {
-        console.error('Error detecting user language:', error);
-        return 'en';
-    }
+export function getLanguages() {
+    return Object.entries(LANGUAGES).map(([code, info]) => ({ code, ...info }));
 }
 
-/**
- * Load translations dynamically based on the selected language
- * @returns {Promise<void>}
- */
-export async function loadTranslations() {
-    try {
-        // load Englsih as base translations
-        const baseResponse = await fetch('./locales/strings/en.xml');
-        const baseXML = await baseResponse.text();
-        baseTranslations = parseTranslationsXML(baseXML);
-
-        // load user's language if available
-        const lang = await detectUserLanguage();
-        if (lang !== 'en') {
-            const response = await fetch(`locales/strings/${lang}.xml`);
-            const userXML = await response.text();
-            const userTranslations = parseTranslationsXML(userXML);
-            translations = { ...baseTranslations, ...userTranslations };
-        } else {
-            translations = baseTranslations;
-        }
-
-        // Support for rtl language
-        const isRTL = rtlLang.includes(lang.split('-')[0]);
-        document.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
-
-        // Generate language menu
-        await generateLanguageMenu();
-    } catch (error) {
-        console.error('Error loading translations:', error);
-        translations = baseTranslations;
-    }
-    applyTranslations();
-}
-
-/**
- * Apply translations to all elements with data-i18n attributes
- * @returns {void}
- */
-function applyTranslations() {
-    document.querySelectorAll("[data-i18n]").forEach((el) => {
-        const key = el.getAttribute("data-i18n");
-        const translation = translations[key];
-        if (translation) {
-            if (el.hasAttribute("placeholder")) {
-                el.setAttribute("placeholder", translation);
-            } else if (el.hasAttribute("label")) {
-                el.setAttribute("label", translation);
-            } else {
-                el.textContent = translation;
-            }
-        }
-    });
-}
-
-/**
- * Function to set a language
- * @param {string} language - Target langauge to set
- * @returns {void}
- */
-function setLanguage(language) {
-    localStorage.setItem('mountify_language', language);
-    loadTranslations();
-}
-
-/**
- * Generate the language menu dynamically
- * Refer available-lang.json in ./locales for list of languages
- * @returns {Promise<void>}
- */
-async function generateLanguageMenu() {
-    const languageForm = document.getElementById('language-form');
-    languageForm.innerHTML = '';
-
-    const createOption = (lang, name) => {
-        const label = document.createElement('label');
-        label.className = 'language-option list-item';
-        label.innerHTML = `
-            <md-radio name="language" value="${lang}"></md-radio>
-            <span>${name}</span>
-            <md-ripple></md-ripple>
-        `;
-
-        const radio = label.querySelector('md-radio');
-
-        const currentLang = localStorage.getItem('mountify_language') || 'default';
-        if (currentLang === lang) radio.checked = true;
-
-        radio.addEventListener('change', () => {
-            if (radio.checked) setLanguage(lang);
-        });
-
-        languageForm.appendChild(label);
-    };
-
-    createOption('default', translations['system_default'] || 'System Default');
-
-    const sortedLanguages = Object.entries(languageNames)
-        .map(([lang, name]) => ({ lang, name }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-    sortedLanguages.forEach(({ lang, name }) => {
-        createOption(lang, name);
-    });
-
-    applyTranslations();
+export function initLanguage() {
+    const saved = localStorage.getItem('mountify_lang');
+    if (saved && TRANSLATIONS[saved]) currentLang = saved;
 }

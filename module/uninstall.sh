@@ -1,25 +1,12 @@
-#!/bin/sh
-# uninstall.sh
-# this script is part of mountify
-# No warranty.
-# No rights reserved.
-# This is free software; you can redistribute it and/or modify it under the terms of The Unlicense.
+#!/system/bin/sh
 PATH=/data/adb/ap/bin:/data/adb/ksu/bin:/data/adb/magisk:$PATH
-FLAGS="/data/adb/.litemode_enable"
+MODDIR="/data/adb/modules/mountify-rs"
 
-# remove skip_mount on modules we skip_mounted
-for module in $(cat /data/adb/mountify/skipped_modules) ; do 
-	rm /data/adb/modules/"$module"/skip_mount > /dev/null 2>&1
-done
+ARCH=$(uname -m)
+case "$ARCH" in
+	aarch64|arm64) BIN="$MODDIR/mountify-arm64" ;;
+	armv7*|arm*)   BIN="$MODDIR/mountify-arm" ;;
+	*)             BIN="$MODDIR/mountify-arm64" ;;
+esac
 
-# remove flags created by mountify webui
-for flag in $FLAGS; do
-	if [ -f "$flag" ] && grep -q "mountify" "$flag"; then
-		rm -f "$flag"
-	fi
-done
-
-# delete config directory
-[ -d "/data/adb/mountify/" ] && rm -rf "/data/adb/mountify/"
-
-# EOF
+exec $BIN uninstall

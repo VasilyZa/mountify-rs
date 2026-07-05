@@ -1,525 +1,275 @@
 import { exec, toast } from 'kernelsu-alt';
-import '@material/web/all.js';
-import * as file from './file.js';
-import { loadTranslations, translations } from './language.js';
+import { t, getLang, setLang, getLanguages, initLanguage } from './language.js';
 
-const moddir = '/data/adb/modules/mountify';
-export let config = {};
-let configMetadata = {};
-const functions = { isKsu };
+const MODDIR = '/data/adb/modules/mountify';
+const CFG = '/data/adb/mountify/config.sh';
 
-async function checkReq(req) {
-    for (const [reqKey, reqValue] of Object.entries(req)) {
-        if (reqKey === "JavaScript") {
-            if (typeof reqValue !== 'object') continue;
-            for (const [funcName, expected] of Object.entries(reqValue)) {
-                if (typeof functions[funcName] !== 'function') {
-                    toast(`invalid function ${funcName}`);
-                    return false;
-                }
-                try {
-                    const result = await functions[funcName]();
-                    if (result !== expected) {
-                        return false;
-                    }
-                } catch (e) {
-                    console.error(e);
-                    return false;
-                }
-            }
-        } else {
-            if (config[reqKey] !== reqValue) {
-                return false;
-            }
-        }
+let config = {};
+
+const META = {
+    mountify_mounts: { tab: 'general', opts: [0, 1, 2], key: 'mountify_mounts' },
+    FAKE_MOUNT_NAME: { tab: 'general', key: 'FAKE_MOUNT_NAME' },
+    test_decoy_mount: { tab: 'general', opts: [0, 1], key: 'test_decoy_mount' },
+    mountify_stop_start: { tab: 'general', opts: [0, 1], key: 'mountify_stop_start' },
+    FS_TYPE_ALIAS: { tab: 'general', opts: ['overlay'], key: 'FS_TYPE_ALIAS' },
+    MOUNT_DEVICE_NAME: { tab: 'general', opts: ['overlay', 'KSU', 'APatch', 'magisk'], key: 'MOUNT_DEVICE_NAME' },
+    mountify_custom_umount: { tab: 'general', opts: [0, 1, 2], key: 'mountify_custom_umount' },
+    mountify_expert_mode: { tab: 'general', opts: [0, 1], key: 'mountify_expert_mode', advanced: true },
+    use_ext4_sparse: { tab: 'ext4', opts: [0, 1], key: 'use_ext4_sparse' },
+    spoof_sparse: { tab: 'ext4', opts: [0, 1], key: 'spoof_sparse' },
+    FAKE_APEX_NAME: { tab: 'ext4', opts: ['com.android.mntservice'], key: 'FAKE_APEX_NAME' },
+    sparse_size: { tab: 'ext4', opts: ['512', '1024', '2048', '4096'], key: 'sparse_size' },
+    enable_lkm_nuke: { tab: 'ext4', opts: [0, 1], key: 'enable_lkm_nuke' },
+    lkm_filename: { tab: 'ext4', opts: [
+        'nuke-android12-5.10.ko', 'nuke-android13-5.10.ko', 'nuke-android13-5.15.ko',
+        'nuke-android14-5.15.ko', 'nuke-android14-6.1.ko', 'nuke-android15-6.6.ko',
+        'nuke-android16-6.12.ko', 'nuke-android-4.14.ko'
+    ], key: 'lkm_filename' },
+};
+
+function lang(key) { return t(key); }
+
+async function loadConfig() {
+    const r = await exec(`cat ${CFG} 2>/dev/null || echo "#fail"`);
+    if (r.errno !== 0 || r.stdout.includes('#fail')) { toast(lang('toast.config_not_found')); return {}; }
+    const cfg = {};
+    for (const line of r.stdout.split('\n')) {
+        const s = line.trim();
+        if (!s || s.startsWith('#') || !s.includes('=')) continue;
+        const idx = s.indexOf('=');
+        let k = s.slice(0, idx).trim(), v = s.slice(idx + 1).trim();
+        if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+        cfg[k] = v;
     }
-    return true;
+    return cfg;
 }
 
-function showDescription(title, description) {
-    const dialog = document.getElementById('description-dialog');
-    const closeBtn = dialog.querySelector('[value="close"]');
-    const headline = dialog.querySelector('[slot="headline"]');
-    const content = dialog.querySelector('[slot="content"]');
-    headline.innerHTML = title;
-    content.innerHTML = description.replace(/\n/g, '<br>');
-    closeBtn.onclick = () => dialog.close();
-    window.onscroll = () => dialog.close();
-    dialog.show();
+async function saveConfig() {
+    const lines = Object.entries(config).map(([k, v]) => {
+        const isStr = isNaN(v) || (typeof v === 'string' && !/^\d+$/.test(v));
+        return isStr ? `${k}="${v}"` : `${k}=${v}`;
+    });
+    const r = await exec(`cat > ${CFG} << 'EOF'\n${lines.join('\n')}\nEOF`);
+    if (r.errno !== 0) toast(lang('toast.save_failed'));
 }
 
-async function appendInputGroup() {
-    for (const key in config) {
-        if (Object.prototype.hasOwnProperty.call(config, key)) {
-            const value = config[key];
-            const metadata = configMetadata[key] || false;
-            const options = metadata?.option || [];
-            const header = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
-            const container = document.getElementById(`content-${metadata.type}`);
-            const div = document.createElement('div');
-            div.className = 'input-group content';
-            div.dataset.key = key;
+function updateStatus() {
+    const modeMap = { '0': lang('stat.off'), '1': lang('stat.manual'), '2': lang('stat.auto') };
+    const fsMap = { '1': lang('stat.ext4') };
+    document.getElementById('stat-mode').textContent = modeMap[config.mountify_mounts] || '--';
+    document.getElementById('stat-fstype').textContent = config.use_ext4_sparse === '1' ? lang('stat.ext4') : config.spoof_sparse === '1' ? lang('stat.apex') : lang('stat.tmpfs');
+    document.getElementById('stat-modules').textContent = config.mountify_mounts === '0' ? lang('stat.na') : lang('stat.active');
+}
 
-            if (!metadata) continue;
-            if (metadata.option) {
-                if (metadata.option[0] === 'allow-other') { // Fixed options + custom input
-                    appendTextField(key, value, div, options, header);
-                } else { // Fixed options only
-                    appendSelect(key, value, div, options, header);
-                }
-            } else { // Raw text field
-                appendTextField(key, value, div, null, header);
-            }
-            container.appendChild(div);
-        }
+function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        const text = lang(key);
+        if (text !== key) el.textContent = text;
+    });
+    // tab labels need span inside
+    document.querySelectorAll('.tab span[data-i18n]').forEach(el => {
+        el.textContent = lang(el.dataset.i18n);
+    });
+}
+
+function render() {
+    for (const tab of ['general', 'ext4', 'advanced']) {
+        const el = document.getElementById(`${tab}-group`);
+        if (el) el.innerHTML = '';
     }
 
-    // Requirement
-    for (const key in configMetadata) {
-        const metadata = configMetadata[key];
-        if (metadata.require) {
-            const dependentGroup = document.querySelector(`.input-group[data-key="${key}"]`);
-            if (!dependentGroup) continue;
-            const dependentInput = dependentGroup.querySelector('md-outlined-select, md-outlined-text-field');
-            if (!dependentInput) continue;
+    for (const [key, meta] of Object.entries(META)) {
+        const group = document.getElementById(`${meta.tab}-group`);
+        if (!group) continue;
 
-            const checkAndSetDisabled = async () => {
-                const satisfied = (await Promise.all(metadata.require.map(checkReq))).every(Boolean);
-                dependentInput.disabled = !satisfied;
-            };
+        const row = document.createElement('div');
+        row.className = 'config-row';
+        if (meta.advanced) row.dataset.advanced = 'true';
 
-            metadata.require.forEach(req => {
-                Object.keys(req).forEach(reqKey => {
-                    const requirementGroup = document.querySelector(`.input-group[data-key="${reqKey}"]`);
-                    if (requirementGroup) {
-                        const requirementInput = requirementGroup.querySelector('md-outlined-select, md-outlined-text-field');
-                        if (requirementInput) {
-                            const eventType = requirementInput.tagName.toLowerCase() === 'md-outlined-select' ? 'change' : 'input';
-                            requirementInput.addEventListener(eventType, checkAndSetDisabled);
-                        }
-                    }
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = key;
+        const hint = document.createElement('span');
+        hint.className = 'hint';
+        hint.textContent = '?';
+        const descKey = `desc.${meta.key}`;
+        hint.title = lang(descKey);
+        hint.onclick = (e) => { e.stopPropagation(); showDesc(key, lang(descKey)); };
+        label.appendChild(hint);
+
+        const ctrl = document.createElement('div');
+        ctrl.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+        const val = String(config[key] ?? '');
+
+        if (meta.opts) {
+            const isBool = meta.opts.length === 2 && meta.opts.every(o => o === 0 || o === 1);
+            if (isBool) {
+                const cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.className = 'switch';
+                cb.checked = val === '1';
+                cb.onchange = async () => { config[key] = cb.checked ? '1' : '0'; await saveConfig(); updateStatus(); };
+                ctrl.appendChild(cb);
+            } else if (meta.opts.length <= 12) {
+                const sel = document.createElement('select');
+                meta.opts.forEach(o => {
+                    const opt = document.createElement('option');
+                    opt.value = String(o); opt.textContent = String(o);
+                    if (String(o) === val) opt.selected = true;
+                    sel.appendChild(opt);
                 });
-            });
-            checkAndSetDisabled();
-        }
-    }
-
-    setupKeyboard();
-    appendExtras();
-}
-
-/**
- * Append text field with options or raw text field if no option provided
- * @param {string} key - config name
- * @param {string} value - config value
- * @param {HTMLElement} el - Parent element to append
- * @param {string[]} options - options to show
- * @param {string} header - Help menu header
- * @returns {void}
- */
-function appendTextField(key, value, el, options, header) {
-    const textField = document.createElement('md-outlined-text-field');
-    textField.label = key;
-    textField.value = value;
-    textField.innerHTML = `
-        <md-icon-button slot="trailing-icon">
-            <md-icon>info</md-icon>
-        </md-icon-button>
-    `;
-    textField.querySelector('md-icon-button').onclick = () => {
-        showDescription(header, translations['desc_' + key]);
-    }
-    el.appendChild(textField);
-
-    if (!options) { // Raw text field
-        textField.addEventListener('input', (event) => {
-            const newValue = event.target.value;
-            if (typeof config[key] === 'number') {
-                config[key] = parseInt(newValue) || 0;
-            } else {
-                config[key] = newValue;
+                sel.onchange = async () => { config[key] = sel.value; await saveConfig(); updateStatus(); };
+                ctrl.appendChild(sel);
             }
-        });
-        return;
-    }
-
-    const menu = document.createElement('md-menu');
-    menu.defaultFocus = '';
-    menu.skipRestoreFocus = true;
-    menu.anchorCorner = 'start-start';
-    menu.menuCorner = 'end-start';
-    menu.anchorElement = textField;
-    el.appendChild(menu);
-
-    // append all options once and toggle visibility with style.display on filter
-    options.slice(1).forEach(opt => {
-        const menuItem = document.createElement('md-menu-item');
-        menuItem.dataset.option = opt;
-        menuItem.innerHTML = `<div slot="headline">${opt}</div>`;
-        menuItem.addEventListener('click', () => {
-            textField.value = opt;
-            if (typeof config[key] === 'number') {
-                config[key] = parseInt(opt) || 0;
-            } else {
-                config[key] = opt;
-            }
-            menu.close();
-        });
-        menu.appendChild(menuItem);
-    });
-
-    const filterMenuItems = (value) => {
-        const newValue = String(value || '');
-        if (typeof config[key] === 'number') {
-            config[key] = parseInt(newValue) || 0;
         } else {
-            config[key] = newValue;
+            const inp = document.createElement('input');
+            inp.type = 'text'; inp.value = val;
+            inp.onchange = async () => { config[key] = inp.value; await saveConfig(); };
+            ctrl.appendChild(inp);
         }
 
-        const needle = newValue.toLowerCase();
-        let visible = 0;
-        menu.querySelectorAll('md-menu-item').forEach(mi => {
-            const opt = (mi.dataset.option || '').toLowerCase();
-            const show = opt.includes(needle) && opt !== needle;
-            mi.style.display = show ? '' : 'none';
-            if (show) visible++;
-        });
-
-        if (visible > 0) {
-            menu.show();
-        } else {
-            menu.close();
-        }
+        row.appendChild(label); row.appendChild(ctrl);
+        group.appendChild(row);
     }
 
-    textField.addEventListener('input', (event) => filterMenuItems(event.target.value));
-    textField.addEventListener('focus', (event) => {
-        setTimeout(() => {
-            if (document.activeElement === textField) filterMenuItems(event.target.value);
-        }, 100);
+    updateStatus();
+    applyI18n();
+    toggleAdvanced();
+}
+
+function showDesc(title, body) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = body.replace(/\n/g, '<br>');
+    document.getElementById('desc-modal').classList.add('active');
+}
+
+function toggleAdvanced() {
+    const show = document.getElementById('advanced-toggle')?.checked;
+    document.querySelectorAll('[data-advanced="true"]').forEach(el => el.style.display = show ? '' : 'none');
+}
+
+// --- Init ---
+function initTabs() {
+    document.querySelectorAll('.tab').forEach(t => {
+        t.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+            t.classList.add('active');
+            document.getElementById(`panel-${t.dataset.tab}`).classList.add('active');
+        });
     });
 }
 
-/**
- * Append select options
- * @param {string} key - config name
- * @param {string} value - config value
- * @param {HTMLElement} el - Parent element to append
- * @param {string[]} options - options to show
- * @param {string} header - Help menu header
- * @returns {void}
- */
-function appendSelect(key, value, el, options, header) {
-    const select = document.createElement('md-outlined-select');
-    select.label = key;
-    select.innerHTML = `
-        <md-icon-button slot="trailing-icon">
-            <md-icon>info</md-icon>
-        </md-icon-button>
-    `;
-    select.querySelector('md-icon-button').addEventListener('click', (e) => {
-        e.stopPropagation();
-        showDescription(header, translations['desc_' + key]);
+function initModals() {
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        m.addEventListener('click', e => { if (e.target === m || e.target.closest('.modal-close')) m.classList.remove('active'); });
     });
-
-    options.forEach(opt => {
-        const option = document.createElement('md-select-option');
-        option.value = opt;
-        option.innerHTML = `<div slot="headline">${opt}</div>`;
-        if (opt == value) option.selected = true;
-        select.appendChild(option);
-    });
-
-    select.addEventListener('change', (event) => {
-        const newValue = event.target.value;
-        if (typeof config[key] === 'number') {
-            config[key] = parseInt(newValue) || 0;
-        } else {
-            config[key] = newValue;
-        }
-        file.writeConfig();
-    });
-    el.appendChild(select);
 }
 
-function appendExtras(value) {
-    document.querySelectorAll('.input-group').forEach(group => {
-        const key = group.dataset.key;
-        if (!key) return;
+function initSwitches() {
+    document.getElementById('advanced-toggle').addEventListener('change', toggleAdvanced);
+    document.getElementById('update-toggle').addEventListener('change', async function () {
+        const s = this.checked ? 'updateJson' : 'updateLink';
+        await exec(`sed -i "s/updateLink\\|updateJson/${s}/g" ${MODDIR}/module.prop`);
+    });
+    exec(`grep -q "^updateJson=" ${MODDIR}/module.prop`).then(r => {
+        document.getElementById('update-toggle').checked = r.errno === 0;
+    });
+}
 
-        if (key === 'mountify_mounts') {
-            const button = document.createElement('md-filled-icon-button');
-            button.innerHTML = `<md-icon>checklist_rtl</md-icon>`;
-            button.onclick = showModuleSelector;
-            group.appendChild(button);
+function initReboot() {
+    const show = () => document.getElementById('reboot-modal').classList.add('active');
+    const hide = () => document.getElementById('reboot-modal').classList.remove('active');
+    document.getElementById('reboot').addEventListener('click', show);
+    document.getElementById('reboot-cancel').addEventListener('click', hide);
+    document.getElementById('reboot-confirm').addEventListener('click', () => {
+        exec('/system/bin/reboot'); hide();
+    });
+}
 
-            const select = group.querySelector('md-outlined-select');
-            const toggleButton = () => button.disabled = config[key] !== 1;
+function initLang() {
+    const list = document.getElementById('lang-list');
+    const modal = document.getElementById('lang-modal');
 
-            select.addEventListener('change', (event) => {
-                const newValue = event.target.value;
-                config[key] = parseInt(newValue) || 0;
-                file.writeConfig();
-                toggleButton();
+    document.getElementById('language').addEventListener('click', () => {
+        list.innerHTML = getLanguages().map(l =>
+            `<div class="module-item" style="cursor:pointer" data-code="${l.code}">${l.native} <span style="color:var(--fg-dim);margin-left:auto;font-size:11px">${l.name}</span></div>`
+        ).join('');
+        list.querySelectorAll('.module-item').forEach(el => {
+            el.addEventListener('click', () => {
+                setLang(el.dataset.code);
+                modal.classList.remove('active');
+                render();
             });
-            toggleButton();
-        }
-
-        if (key === 'FAKE_MOUNT_NAME') {
-            const button = document.createElement('md-filled-icon-button');
-            button.innerHTML = `<md-icon>casino</md-icon>`;
-            button.onclick = () => {
-                const input = group.querySelector('md-outlined-text-field');
-                const randomName = Math.random().toString(36).substring(2, 12);
-                input.value = randomName;
-                config['FAKE_MOUNT_NAME'] = randomName;
-                file.writeConfig();
-            };
-            group.appendChild(button);
-        }
+        });
+        modal.classList.add('active');
     });
 }
 
-async function showModuleSelector() {
-    const dialog = document.getElementById('module-selector-dialog');
-    const saveBtn = dialog.querySelector('md-text-button');
+function initModulePicker() {
     const list = document.getElementById('module-list');
-    list.innerHTML = '';
-    dialog.show();
 
-    const moduleList = await exec(`
-        dir=/data/adb/modules
-        for module in $(ls $dir); do
-            if ls $dir/$module/system >/dev/null 2>&1 && ! ls $dir/$module/system/etc/hosts >/dev/null 2>&1; then
-                echo $module
-            fi
-        done
-    `);
+    const obs = setInterval(() => {
+        if (document.querySelector('.config-row')) {
+            clearInterval(obs);
+            const btn = document.createElement('button');
+            btn.className = 'btn primary';
+            btn.textContent = lang('modules.select');
+            btn.style.cssText = 'padding:6px 12px;font-size:11px';
 
-    exec(`cat /data/adb/mountify/modules.txt`).then((result) => {
-        const selected = result.stdout.trim().split('\n').map(line => line.trim()).filter(Boolean);
-        const modules = moduleList.stdout.trim().split('\n').filter(Boolean);
-
-        list.innerHTML = modules.map(module => {
-            const isChecked = selected.includes(module);
-            return `
-                <md-list-item>
-                    <div slot="headline">${module}</div>
-                    <md-checkbox slot="end" data-module-name="${module}" ${isChecked ? 'checked' : ''}></md-checkbox>
-                </md-list-item>
-            `;
-        }).join('');
-    }).catch(() => { });
-
-    const saveConfig = () => {
-        const selectedModules = Array.from(list.querySelectorAll('md-checkbox'))
-            .filter(checkbox => checkbox.checked)
-            .map(checkbox => checkbox.dataset.moduleName);
-
-        exec(`echo "${selectedModules.join('\n').trim()}" > /data/adb/mountify/modules.txt`).then((result) => {
-            if (result.errno !== 0) {
-                toast('Failed to save: ' + result.stderr);
-            }
-        }).catch(() => { });
-    }
-
-    saveBtn.onclick = () => {
-        saveConfig();
-        dialog.close();
-    };
-    window.onscroll = () => dialog.close();
-}
-
-function setupKeyboard() {
-    document.querySelectorAll('md-outlined-text-field').forEach(input => {
-        input.addEventListener('focus', () => {
-            input.closest('.content-container').classList.add('keyboard-inset');
-            setTimeout(() => {
-                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        });
-        input.addEventListener('blur', () => {
-            file.writeConfig();
-            setTimeout(() => {
-                const activeEl = document.activeElement;
-                if (!activeEl || !['md-outlined-text-field', 'md-outlined-select'].includes(activeEl.tagName.toLowerCase())) {
-                    input.closest('.content-container').classList.remove('keyboard-inset');
+            const updateBtn = () => {
+                const target = [...document.querySelectorAll('.config-row')]
+                    .find(r => r.querySelector('.label')?.textContent?.startsWith('mountify_mounts'));
+                if (target && config.mountify_mounts === '1') {
+                    if (!target.contains(btn)) target.querySelector(':scope > :last-child')?.appendChild(btn);
+                } else {
+                    btn.remove();
                 }
-            }, 100);
-        });
-    });
-}
+            };
 
-function isKsu() {
-    return new Promise((resolve) => {
-        // No su (sucompat disabled)
-        // ksud in PATH when running with su
-        exec('! command -v su || su -c "ksud -h"').then((result) => {
-            resolve(result.errno === 0);
-        }).catch(() => {
-            resolve(false);
-        });
-    });
-}
+            btn.onclick = async () => {
+                const modR = await exec(
+                    `d=/data/adb/modules; for m in $(ls $d); do ` +
+                    `[ -d "$d/$m/system" ] && ! [ -f "$d/$m/system/etc/hosts" ] && echo "$m"; done`
+                );
+                const selR = await exec(`cat /data/adb/mountify/modules.txt 2>/dev/null`);
+                const mods = modR.stdout.trim().split('\n').filter(Boolean);
+                const sel = selR.stdout.trim().split('\n').map(s => s.trim()).filter(Boolean);
 
-function toggleAdvanced(advanced) {
-    document.querySelectorAll('.input-group').forEach(group => {
-        const key = group.dataset.key;
-        if (!key) return;
-        const metadata = configMetadata[key] || false;
-        if (metadata.advanced) {
-            group.style.display = advanced ? '' : 'none';
+                list.innerHTML = mods.map(m =>
+                    `<div class="module-item"><input type="checkbox" value="${m}" ${sel.includes(m) ? 'checked' : ''}> ${m}</div>`
+                ).join('');
+                document.getElementById('module-modal').classList.add('active');
+            };
+
+            document.getElementById('module-save').onclick = () => {
+                const ckd = [...list.querySelectorAll('input:checked')].map(c => c.value);
+                exec(`echo "${ckd.join('\n')}" > /data/adb/mountify/modules.txt`);
+                document.getElementById('module-modal').classList.remove('active');
+            };
+
+            const origRender = render;
+            render = function() { origRender(); setTimeout(updateBtn, 50); };
+            document.addEventListener('change', e => {
+                if (e.target.closest('.config-row')?.querySelector('.label')?.textContent?.startsWith('mountify_mounts')) {
+                    setTimeout(updateBtn, 100);
+                }
+            });
         }
-    });
-}
-
-// Overwrite default dialog animation
-document.querySelectorAll('md-dialog').forEach(dialog => {
-    const defaulfOpenAnim = dialog.getOpenAnimation;
-    const defaultCloseAnim = dialog.getCloseAnimation;
-
-    dialog.getOpenAnimation = () => {
-        const defaultAnim = defaulfOpenAnim.call(dialog);
-        const customAnim = {};
-        Object.keys(defaultAnim).forEach(key => customAnim[key] = defaultAnim[key]);
-
-        customAnim.dialog = [
-            [
-                [{ opacity: 0, transform: 'translateY(50px)' }, { opacity: 1, transform: 'translateY(0)' }],
-                { duration: 300, easing: 'ease' }
-            ]
-        ];
-        customAnim.scrim = [
-            [
-                [{ 'opacity': 0 }, { 'opacity': 0.32 }],
-                { duration: 300, easing: 'linear' },
-            ],
-        ];
-        customAnim.container = [];
-
-        return customAnim;
-    };
-
-    dialog.getCloseAnimation = () => {
-        const defaultAnim = defaultCloseAnim.call(dialog);
-        const customAnim = {};
-        Object.keys(defaultAnim).forEach(key => customAnim[key] = defaultAnim[key]);
-
-        customAnim.dialog = [
-            [
-                [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-50px)' }],
-                { duration: 300, easing: 'ease' }
-            ]
-        ];
-        customAnim.scrim = [
-            [
-                [{ 'opacity': 0.32 }, { 'opacity': 0 }],
-                { duration: 300, easing: 'linear' },
-            ],
-        ];
-        customAnim.container = [];
-
-        return customAnim;
-    };
-});
-
-function initTab() {
-    const mdTab = document.querySelector('md-tabs');
-    const contentContainers = document.querySelectorAll('.content-container');
-
-    const updateTabPositions = () => {
-        const activeTab = mdTab.querySelector('md-primary-tab[active]');
-        if (!activeTab) return;
-
-        const tabIndex = Array.from(mdTab.querySelectorAll('md-primary-tab')).indexOf(activeTab);
-        contentContainers.forEach((container, index) => {
-            const translateX = (index - tabIndex) * 100;
-            container.style.transform = `translateX(${translateX}%)`;
-            setTimeout(() => {
-                container.style.transition = 'transform 0.3s ease';
-                container.classList.remove('unresolved');
-            }, 10);
-        });
-    };
-
-    contentContainers.forEach((container, index) => {
-        const translateX = index * 100;
-        container.style.transform = `translateX(${translateX}%)`;
-    });
-
-    updateTabPositions();
-    mdTab.addEventListener('change', async () => {
-        await Promise.resolve();
-        updateTabPositions();
-    });
-}
-
-function initUpdateSwitch() {
-    const updateSwitch = document.getElementById('update');
-    function checkUpdateState() {
-        exec(`grep -q "^updateJson=" ${moddir}/module.prop`).then((result) => {
-            updateSwitch.selected = result.errno === 0;
-        });
-    }
-    checkUpdateState();
-    updateSwitch.addEventListener('change', () => {
-        const cmd = updateSwitch.selected ? `"s/updateLink/updateJson/g"` : `"s/updateJson/updateLink/g"`;
-        exec(`sed -i ${cmd} ${moddir}/module.prop`).then((result) => {
-            checkUpdateState();
-            if (result.errno !== 0) toast('Failed to toggle update: ' + result.stderr);
-        }).catch(() => { });
-    });
-}
-
-function initRebootButton() {
-    document.getElementById('reboot').onclick = () => {
-        const confirmationDialog = document.getElementById('confirm-reboot-dialog');
-        confirmationDialog.show();
-        window.onscroll = () => confirmationDialog.close();
-        confirmationDialog.querySelectorAll('md-text-button').forEach(btn => {
-            btn.onclick = () => {
-                confirmationDialog.close();
-                if (btn.value === 'reboot') {
-                    exec('/system/bin/reboot').then((result) => {
-                        if (result.errno !== 0) toast('Failed to reboot: ' + result.stderr);
-                    }).catch(() => { });
-                }
-            }
-        });
-    }
-}
-
-function initLanguageButton() {
-    const langaugeDialog = document.getElementById('language-dialog');
-    document.getElementById('language').onclick = () => {
-        langaugeDialog.show();
-        window.onscroll = () => langaugeDialog.close();
-        langaugeDialog.querySelectorAll('label, md-text-button').forEach(el => {
-            el.onclick = () => langaugeDialog.close();
-        });
-    }
+    }, 500);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadTranslations();
-    document.querySelectorAll('[unresolved]').forEach(el => el.removeAttribute('unresolved'));
-
-    [config, configMetadata] = await Promise.all([file.loadConfig(), file.loadConfigMetadata()]);
-    const advanced = document.getElementById('advanced');
-    advanced.selected = localStorage.getItem('mountify_advanced') === 'true';
-    advanced.addEventListener('change', () => {
-        localStorage.setItem('mountify_advanced', advanced.selected ? 'true' : 'false');
-        if (config) toggleAdvanced(advanced.selected);
-    });
-    if (config) {
-        await appendInputGroup();
-        toggleAdvanced(advanced.selected);
-    }
-    file.loadVersion();
-
-    initTab();
-
-    initLanguageButton();
-    initRebootButton();
-    initUpdateSwitch();
+    initLanguage();
+    config = await loadConfig();
+    initTabs();
+    initModals();
+    initSwitches();
+    initReboot();
+    initLang();
+    render();
+    initModulePicker();
+    const v = await exec(`grep "^version=" ${MODDIR}/module.prop | cut -d= -f2`);
+    if (v.errno === 0) document.getElementById('version').textContent = v.stdout.trim();
 });
