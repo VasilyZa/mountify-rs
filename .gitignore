@@ -23,5 +23,6 @@ mountify_module.zip
 # Test artifacts
 test.out
 
-# pnpm lock
+# Build lockfiles
 pnpm-lock.yaml
+package-lock.json
