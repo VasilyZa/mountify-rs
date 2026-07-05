@@ -153,7 +153,7 @@ function toggleAdvanced() {
 async function updateMountedModules() {
     const el = document.getElementById('mounted-list');
     if (!el) return;
-    const r = await exec(`cat /dev/mountify_logs/modules 2>/dev/null || echo ""`);
+    const r = await exec(`cat /data/adb/mountify/mounted_modules 2>/dev/null || echo ""`);
     const modules = r.stdout.trim().split('\n').filter(Boolean);
     if (modules.length === 0) {
         el.textContent = config.mountify_mounts === '0' ? lang('stat.na') : lang('mounted.none');
