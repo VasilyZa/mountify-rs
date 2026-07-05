@@ -7,21 +7,19 @@ on:
   workflow_dispatch:
 
 env:
-  MODULE_NAME: 'mountify'
+  MODULE_NAME: 'mountify-rs'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 2
+      uses: actions/checkout@v4
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: aarch64-linux-android, armv7-linux-androideabi
+        targets: aarch64-linux-android
 
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
@@ -37,40 +35,30 @@ jobs:
         cargo build --release --target aarch64-linux-android
         cp target/aarch64-linux-android/release/mountify ../mountify-arm64
 
-    - name: Build Rust core (arm)
-      run: |
-        cd module/mountify-rs
-        ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }} \
-        CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang" \
-        cargo build --release --target armv7-linux-androideabi
-        cp target/armv7-linux-androideabi/release/mountify ../mountify-arm
-
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v5
-      with:
-        version: 'latest'
-
     - name: Setup Node
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v4
       with:
-        node-version: 'latest'
-        cache: 'pnpm'
-        cache-dependency-path: webui/pnpm-lock.yaml
+        node-version: '22'
 
-    - name: Build webui
+    - name: Build WebUI
       run: |
         cd webui
-        pnpm install --frozen-lockfile
-        pnpm run build
+        npm install
+        npm run build
 
-    - name: Set variables
+    - name: Package module
       run: |
-        VERSION=$(jq -r .version update.json)
+        VERSION=$(grep "^version=" module/module.prop | cut -d= -f2 | tr -d 'v')
         COMMIT_ID=$(git rev-parse --short HEAD)
-        echo "ZIP_NAME=${{ env.MODULE_NAME }}_${VERSION}-${COMMIT_ID}" >> $GITHUB_ENV
+        ZIP_NAME="${MODULE_NAME}_v${VERSION}-${COMMIT_ID}.zip"
+        cd module
+        zip -r "../${ZIP_NAME}" . \
+          -x "mountify-rs/target/*" "mountify-rs/Cargo.lock" \
+          -x "*.git*" "*.log"
+        echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ env.ZIP_NAME }}
-        path: 'module'
+        path: ${{ env.ZIP_NAME }}
