@@ -54,7 +54,13 @@
         </nav>
 
         <main class="panels">
-            <div class="panel active" id="panel-general"><div class="card" id="general-group"></div></div>
+            <div class="panel active" id="panel-general">
+                <div class="card" id="general-group"></div>
+                <div class="card">
+                    <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg-dim);margin-bottom:8px;letter-spacing:1px" data-i18n="mounted.title">MOUNTED MODULES</div>
+                    <div id="mounted-list" style="font-family:var(--font-mono);font-size:12px;color:var(--fg-dim);line-height:1.8">--</div>
+                </div>
+            </div>
             <div class="panel" id="panel-ext4"><div class="card" id="ext4-group"></div></div>
             <div class="panel" id="panel-advanced">
                 <div class="card">

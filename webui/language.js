@@ -54,6 +54,8 @@ const TRANSLATIONS = {
         'about.thanks': 'Special Thanks',
         'about.thanks.orig': 'backslashxx — original mountify author',
         'about.thanks.tester': 'dyzihnieg — first beta tester',
+        'mounted.title': 'MOUNTED MODULES',
+        'mounted.none': 'No modules mounted',
     },
     'zh-CN': {
         'tab.general': '常规',
@@ -105,6 +107,8 @@ const TRANSLATIONS = {
         'about.thanks': '特别鸣谢',
         'about.thanks.orig': 'backslashxx — 原始 mountify 作者',
         'about.thanks.tester': 'dyzihnieg — 第一位内测用户',
+        'mounted.title': '已挂载模块',
+        'mounted.none': '暂未挂载模块',
     },
 };
 

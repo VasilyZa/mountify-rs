@@ -6,3 +6,4 @@ pub mod uninstall;
 pub mod status;
 pub mod whiteout;
 pub mod metainstall;
+pub mod mounted;

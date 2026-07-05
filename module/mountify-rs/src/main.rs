@@ -29,6 +29,9 @@ fn main() {
         Commands::Metainstall { modid, modpath } => {
             mountify::commands::metainstall::run(modid.clone(), modpath.clone())
         }
+        Commands::Mounted => {
+            mountify::commands::mounted::run()
+        }
     };
 
     if let Err(e) = result {
