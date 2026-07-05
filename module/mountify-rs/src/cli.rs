@@ -38,6 +38,9 @@ pub enum Commands {
     /// Show mount status (replaces action.sh)
     Status,
 
+    /// List currently mounted modules
+    Mounted,
+
     /// Generate whiteout module (replaces whiteout_gen.sh)
     WhiteoutGen {
         /// Optional whiteout list file
