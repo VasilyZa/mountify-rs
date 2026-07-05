@@ -52,9 +52,10 @@ jobs:
         COMMIT_ID=$(git rev-parse --short HEAD)
         ZIP_NAME="${MODULE_NAME}_v${VERSION}-${COMMIT_ID}.zip"
         cd module
-        zip -r "../${ZIP_NAME}" . \
-          -x "mountify-rs/target/*" "mountify-rs/Cargo.lock" \
-          -x "*.git*" "*.log"
+        # Remove build artifacts
+        rm -rf mountify-rs/target mountify-rs/Cargo.lock
+        # Create standard zip (no compression - store mode for max compat)
+        zip -0 -r "../${ZIP_NAME}" . -x "*.git*" "*.log"
         echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
 
     - name: Upload artifact
