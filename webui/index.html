@@ -47,6 +47,10 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
                 <span data-i18n="tab.advanced">Advanced</span>
             </button>
+            <button class="tab" data-tab="about">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span data-i18n="tab.about">About</span>
+            </button>
         </nav>
 
         <main class="panels">
@@ -64,6 +68,20 @@
                     </label>
                 </div>
                 <div class="card" id="advanced-group"></div>
+            </div>
+            <div class="panel" id="panel-about">
+                <div class="card" style="padding:20px">
+                    <div style="font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-bottom:16px;text-shadow:0 0 8px rgba(0,255,136,0.3)">&gt; mountify-rs v<span id="about-version"></span></div>
+                    <div style="font-size:13px;color:var(--fg-dim);line-height:2">
+                        <div data-i18n="about.desc">用 Rust 重写的 mountify，基于 OverlayFS 全局挂载模块。</div>
+                        <div style="margin-top:16px"><span style="color:var(--fg)">GitHub</span><br><a href="https://github.com/VasilyZa/mountify-rs" target="_blank" style="color:var(--cyan);text-decoration:none">github.com/VasilyZa/mountify-rs</a></div>
+                        <div style="margin-top:12px"><span style="color:var(--fg)" data-i18n="about.author">作者</span><br>VasilyZa</div>
+                        <div style="margin-top:12px"><span style="color:var(--fg)" data-i18n="about.thanks">特别鸣谢</span><br>
+                            <span data-i18n="about.thanks.orig">backslashxx — 原始 mountify 作者</span><br>
+                            <span data-i18n="about.thanks.tester">dyzihnieg — 第一位内测用户</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

@@ -271,5 +271,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     render();
     initModulePicker();
     const v = await exec(`grep "^version=" ${MODDIR}/module.prop | cut -d= -f2`);
-    if (v.errno === 0) document.getElementById('version').textContent = v.stdout.trim();
+    if (v.errno === 0) {
+        document.getElementById('version').textContent = v.stdout.trim();
+        document.getElementById('about-version').textContent = v.stdout.trim();
+    }
 });
