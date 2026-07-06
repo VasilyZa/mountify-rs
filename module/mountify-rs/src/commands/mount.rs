@@ -172,10 +172,9 @@ pub fn run(moddir: &str, is_metamodule: bool) -> anyhow::Result<()> {
         mounted_modules.push(module_id.clone());
     }
 
-    // write module list (overwrite) for WebUI & CLI
+    // write module list to tmpfs for current-session WebUI & CLI use
     let module_list_content = mounted_modules.join("\n");
     let _ = fs::write(format!("{}/modules", util::LOG_FOLDER), &module_list_content);
-    let _ = fs::write(format!("{}/mounted_modules", util::PERSISTENT_DIR), &module_list_content);
 
     // handle ext4 remount
     if is_ext4 {

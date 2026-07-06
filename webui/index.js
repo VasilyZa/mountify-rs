@@ -153,13 +153,44 @@ function toggleAdvanced() {
 async function updateMountedModules() {
     const el = document.getElementById('mounted-list');
     if (!el) return;
-    const r = await exec(`cat /data/adb/mountify/mounted_modules 2>/dev/null || echo ""`);
-    const modules = r.stdout.trim().split('\n').filter(Boolean);
+
+    if (config.mountify_mounts === '0') {
+        el.textContent = lang('stat.na');
+        el.style.color = 'var(--fg-dim)';
+        return;
+    }
+
+    // Try session log first (tmpfs, written fresh each boot)
+    const logR = await exec(`cat /dev/mountify_logs/modules 2>/dev/null`);
+    if (logR.errno === 0) {
+        const modules = logR.stdout.trim().split('\n').filter(Boolean);
+        if (modules.length > 0) {
+            el.innerHTML = modules.map(m =>
+                `<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><span style="color:var(--accent)">&#9656;</span> ${m}</div>`
+            ).join('');
+            el.style.color = 'var(--fg)';
+            return;
+        }
+    }
+
+    // Fallback: real-time scan /data/adb/modules/
+    const scanR = await exec(
+        `dir=/data/adb/modules; for m in $(ls "$dir" 2>/dev/null); do ` +
+        `[ -d "$dir/$m/system" ] && ` +
+        `! [ -f "$dir/$m/disable" ] && ! [ -f "$dir/$m/remove" ] && ` +
+        `! [ -f "$dir/$m/skip_mountify" ] && ` +
+        `! [ -f "$dir/$m/system/etc/hosts" ] && ` +
+        `echo "$m"; done`
+    );
+    const modules = scanR.stdout.trim().split('\n').filter(Boolean);
+
     if (modules.length === 0) {
-        el.textContent = config.mountify_mounts === '0' ? lang('stat.na') : lang('mounted.none');
+        el.textContent = lang('mounted.none');
         el.style.color = 'var(--fg-dim)';
     } else {
-        el.innerHTML = modules.map(m => `<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><span style="color:var(--accent)">&#9656;</span> ${m}</div>`).join('');
+        el.innerHTML = modules.map(m =>
+            `<div style="display:flex;align-items:center;gap:8px;padding:2px 0"><span style="color:var(--accent)">&#9656;</span> ${m}</div>`
+        ).join('');
         el.style.color = 'var(--fg)';
     }
 }
