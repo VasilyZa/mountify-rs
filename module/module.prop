@@ -1,0 +1,7 @@
+id=mountify-rs
+name=mountify-rs
+version=v1.1.2
+versionCode=112
+author=小白
+metamodule=true
+description=使用 OverlayFS 全局挂载模块 - Rust 重构版

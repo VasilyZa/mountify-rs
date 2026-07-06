@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_general">General</string>
+    <string name="tab_ext4">Ext4</string>
+    <string name="tab_advanced">Advanced</string>
+</resources>

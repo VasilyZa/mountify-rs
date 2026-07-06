@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  MODULE_NAME: 'mountify'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 2
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, armv7-linux-androideabi
+
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r27
+
+    - name: Build Rust core (arm64)
+      run: |
+        cd module/mountify-rs
+        ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }} \
+        CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang" \
+        cargo build --release --target aarch64-linux-android
+        cp target/aarch64-linux-android/release/mountify ../mountify-arm64
+
+    - name: Build Rust core (arm)
+      run: |
+        cd module/mountify-rs
+        ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }} \
+        CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang" \
+        cargo build --release --target armv7-linux-androideabi
+        cp target/armv7-linux-androideabi/release/mountify ../mountify-arm
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v5
+      with:
+        version: 'latest'
+
+    - name: Setup Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: 'latest'
+        cache: 'pnpm'
+        cache-dependency-path: webui/pnpm-lock.yaml
+
+    - name: Build webui
+      run: |
+        cd webui
+        pnpm install --frozen-lockfile
+        pnpm run build
+
+    - name: Set variables
+      run: |
+        VERSION=$(jq -r .version update.json)
+        COMMIT_ID=$(git rev-parse --short HEAD)
+        echo "ZIP_NAME=${{ env.MODULE_NAME }}_${VERSION}-${COMMIT_ID}" >> $GITHUB_ENV
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.ZIP_NAME }}
+        path: 'module'

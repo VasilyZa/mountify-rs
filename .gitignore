@@ -1,0 +1,33 @@
+# Built WebUI (generated from webui/)
+module/webroot/
+
+# Built Rust binary (generated in CI)
+module/mountify-arm64
+
+# Rust build artifacts
+module/mountify-rs/target/
+module/mountify-rs/Cargo.lock
+
+# Node
+webui/node_modules/
+
+# Build output
+mountify_module.zip
+
+# Android NDK
+/Droid/
+
+# Logs
+*.log
+
+# Test artifacts
+test.out
+
+# pnpm lock
+pnpm-lock.yaml
+
+# Build artifacts
+*.zip
+*.log
+webui/package-lock.json
+webui/node_modules/
