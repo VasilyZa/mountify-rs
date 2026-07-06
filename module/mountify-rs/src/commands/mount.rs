@@ -170,25 +170,12 @@ pub fn run(moddir: &str, is_metamodule: bool) -> anyhow::Result<()> {
         }
 
         mounted_modules.push(module_id.clone());
-        // log to tmpfs (for current session)
-        let _ = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(format!("{}/modules", util::LOG_FOLDER))
-            .and_then(|f| {
-                use std::io::Write;
-                writeln!(&f, "{}", module_id)
-            });
-        // log to persistent storage (for WebUI)
-        let _ = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(format!("{}/mounted_modules", util::PERSISTENT_DIR))
-            .and_then(|f| {
-                use std::io::Write;
-                writeln!(&f, "{}", module_id)
-            });
     }
+
+    // write module list (overwrite) for WebUI & CLI
+    let module_list_content = mounted_modules.join("\n");
+    let _ = fs::write(format!("{}/modules", util::LOG_FOLDER), &module_list_content);
+    let _ = fs::write(format!("{}/mounted_modules", util::PERSISTENT_DIR), &module_list_content);
 
     // handle ext4 remount
     if is_ext4 {
